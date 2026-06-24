@@ -1,0 +1,1996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hyderabad PG + Flat Finder</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap');
+  :root{
+    --bg: #fff5f8;
+    --panel: #ffffff;
+    --panel-2: #fff0f6;
+    --line: #ffd6e7;
+    --text: #5a3344;
+    --muted: #b07f96;
+    --flat: #3b82f6;
+    --flat-soft: rgba(59,130,246,0.12);
+    --pg: #ef4444;
+    --pg-soft: rgba(239,68,68,0.12);
+    --accent: #ff6fa5;
+    --accent-2: #ffb6d2;
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);}
+  #app{display:flex;height:100vh;min-height:560px;}
+
+  /* Sidebar */
+  #sidebar{
+    width:340px;min-width:280px;flex-shrink:0;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+  .brand{padding:18px 18px 12px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,#fff0f6,#ffffff);}
+  .brand h1{font-family:'Quicksand',sans-serif;font-size:18px;margin:0 0 2px;letter-spacing:0.2px;color:var(--accent);}
+  .brand p{margin:0;font-size:12px;color:var(--muted);}
+
+  .tile-note{
+    margin:10px 14px 0;padding:8px 10px;border-radius:10px;background:var(--panel-2);
+    border:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.4;
+  }
+
+  .legend{display:flex;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .dot.flat{background:var(--flat);}
+  .dot.pg{background:var(--pg);}
+
+  .controls{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;}
+  .toggle-row{display:flex;gap:8px;}
+  .chip{
+    flex:1;text-align:center;padding:7px 8px;border-radius:20px;font-size:12px;
+    border:1px solid var(--line);cursor:pointer;background:var(--panel-2);color:var(--muted);
+    user-select:none;font-weight:600;
+  }
+  .chip.active.flat{border-color:var(--flat);color:var(--flat);background:var(--flat-soft);}
+  .chip.active.pg{border-color:var(--pg);color:var(--pg);background:var(--pg-soft);}
+
+  .rent-row{font-size:12px;color:var(--muted);}
+  .rent-row .val{color:var(--accent);font-weight:700;}
+  input[type=range]{width:100%;accent-color:var(--accent);margin-top:6px;}
+
+  #addBtn{
+    width:100%;padding:9px;border-radius:20px;border:1.5px dashed var(--accent);
+    background:#fff;color:var(--accent);font-size:13px;cursor:pointer;font-weight:700;
+  }
+  #addBtn.active{background:var(--accent);color:#fff;border-style:solid;}
+
+  #list{flex:1;overflow-y:auto;padding:6px 10px 16px;}
+  .card{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:14px;
+    padding:10px 12px;margin:8px 8px;cursor:pointer;transition:border-color .15s, box-shadow .15s;
+  }
+  .card:hover{border-color:var(--accent-2);box-shadow:0 2px 10px rgba(255,111,165,0.15);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .card-name{font-size:13px;font-weight:700;line-height:1.3;}
+  .badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;}
+  .badge.flat{background:var(--flat-soft);color:var(--flat);}
+  .badge.pg{background:var(--pg-soft);color:var(--pg);}
+  .card-rent{font-size:14px;font-weight:700;margin-top:4px;}
+  .card-area{font-size:11px;color:var(--muted);margin-top:2px;}
+  .card-notes{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;}
+  .card-actions{display:flex;gap:10px;margin-top:8px;}
+  .card-actions a, .card-actions button{
+    font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;text-decoration:none;
+  }
+  .card-actions .del{color:#e0668a;}
+  .empty{padding:20px;text-align:center;color:var(--muted);font-size:12px;}
+
+  /* Map */
+  #map{flex:1;background:#fdeef4;}
+  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border-radius:14px;}
+  .leaflet-popup-tip{background:var(--panel);}
+  .popup-form label{display:block;font-size:11px;color:var(--muted);margin:6px 0 2px;}
+  .popup-form input, .popup-form select, .popup-form textarea{
+    width:100%;padding:5px 7px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--text);font-size:12px;
+  }
+  .popup-form textarea{resize:vertical;min-height:36px;}
+  .popup-form .row{display:flex;gap:8px;}
+  .popup-form .row > div{flex:1;}
+  .popup-save{
+    margin-top:8px;width:100%;padding:6px;border-radius:20px;border:none;
+    background:var(--accent);color:#fff;font-weight:700;font-size:12px;cursor:pointer;
+  }
+  .hint{padding:8px 18px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);background:var(--panel);}
+
+  /* Cute pin markers */
+  .cute-pin{position:relative;width:34px;height:46px;display:flex;align-items:flex-start;justify-content:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.25));}
+  .cute-pin svg{display:block;}
+  .cute-pin .pin-emoji{position:absolute;top:6px;left:0;width:34px;text-align:center;font-size:15px;line-height:1;}
+  .cute-pin.temp-pin .pin-emoji{font-size:14px;}
+
+  @media (max-width: 760px){
+    #app{flex-direction:column;}
+    #sidebar{width:100%;height:46%;border-right:none;border-bottom:1px solid var(--line);}
+    #map{flex:1;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="brand">
+      <h1> Hyderabad PG + Flat Finder</h1>
+      <p>Gachibowli · HITEC City · Madhapur</p>
+    </div>
+    <div class="tile-note">🗺️ Map tiles need an internet connection and load only outside this chat preview's sandbox — they'll show up once you open this file directly in a browser or host it on GitHub Pages. Pins and the list work right here either way!</div>
+    <div class="legend">
+      <span><span class="dot flat"></span>Flats</span>
+      <span><span class="dot pg"></span>PGs</span>
+    </div>
+    <div class="controls">
+      <div class="toggle-row">
+        <div class="chip flat active" id="toggleFlat">Flats</div>
+        <div class="chip pg active" id="togglePg">PGs</div>
+      </div>
+      <div class="rent-row">Max rent: <span class="val" id="rentVal">₹1,30,000</span>
+        <input type="range" id="rentSlider" min="3000" max="130000" step="1000" value="130000">
+      </div>
+      <button id="addBtn">+ Add a listing (click map)</button>
+    </div>
+    <div id="list"></div>
+    <div class="hint" id="hintBar">Click a card to fly to it on the map. Click "+ Add a listing" then tap a spot on the map to drop a pin.</div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const STORAGE_KEY = 'listings';
+let listings = [];
+let markers = {};
+let addMode = false;
+let tempMarker = null;
+let filters = { flat: true, pg: true, maxRent: 130000 };
+const SEED_VERSION = 'v2-full-sheet';
+
+const map = L.map('map', { zoomControl: true }).setView([17.4475, 78.3760], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap, &copy; CARTO',
+  maxZoom: 19
+}).addTo(map);
+
+const SEED = [
+  {
+    "id": "r0",
+    "type": "pg",
+    "name": "Regal Vista Co Living",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.446728,
+    "lng": 78.394788,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Router placement issues in some rooms; huge lobby and pool table on ground floor | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r1",
+    "type": "pg",
+    "name": "SGS Elite Luxury PG for Mens",
+    "rent": 12000,
+    "area": "Kondapur",
+    "lat": 17.460192,
+    "lng": 78.36645,
+    "notes": "Male Only - Two Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Wifi good, rooms small, budget friendly | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r2",
+    "type": "pg",
+    "name": "Mourya Gents PH",
+    "rent": 8000,
+    "area": "Gachibowli",
+    "lat": 17.436458,
+    "lng": 78.34647,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Rooms with balcony cost 8k, without balcony 7.5k | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r3",
+    "type": "pg",
+    "name": "Tarun sai mens deluxe hostel",
+    "rent": 7500,
+    "area": "Madhura Nagar",
+    "lat": 17.431152,
+    "lng": 78.452614,
+    "notes": "Male Only - Triple Sharing | Food 2/5, rating 2/5 | Parking: No Parking, Electricity: Included in rent | Not recommended | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r4",
+    "type": "pg",
+    "name": "GR Grand-2 Womens Stay",
+    "rent": 9500,
+    "area": "Madhapur",
+    "lat": 17.447406,
+    "lng": 78.39126,
+    "notes": "Female Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Gym included | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r5",
+    "type": "pg",
+    "name": "Agasthya Executive PG for Boyz & Men",
+    "rent": 8500,
+    "area": "Narayanguda",
+    "lat": 17.404344,
+    "lng": 78.48673,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | 10 min walk from Narayanaguda Metro, tasty food no non-veg, only 1 bathroom | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r6",
+    "type": "pg",
+    "name": "New Leo Grand PG",
+    "rent": 16000,
+    "area": "Kondapur",
+    "lat": 17.463954,
+    "lng": 78.367152,
+    "notes": "Co Living - Two Sharing | Food 2/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Free wifi, indoor games, close to Masjid Banda | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r7",
+    "type": "pg",
+    "name": "Safe Nest Co-Living & Mens PG hostel",
+    "rent": 8800,
+    "area": "Gachibowli",
+    "lat": 17.43887,
+    "lng": 78.343716,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r8",
+    "type": "pg",
+    "name": "KARTHIKEYA DELUXE MENS PG",
+    "rent": 8500,
+    "area": "Gachibowli",
+    "lat": 17.444438,
+    "lng": 78.351468,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Good maintenance, great ventilation | Source: community sheet, contributor u/Re-ne-ra",
+    "link": ""
+  },
+  {
+    "id": "r9",
+    "type": "pg",
+    "name": "Home (Babai Premium co-living space)",
+    "rent": 10500,
+    "area": "Gachibowli",
+    "lat": 17.444522,
+    "lng": 78.34617,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r10",
+    "type": "pg",
+    "name": "IT living premium stays",
+    "rent": 8333,
+    "area": "Gachibowli",
+    "lat": 17.43749,
+    "lng": 78.349716,
+    "notes": "Co Living - Four Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Near Keka, Deloitte and other MNCs | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r11",
+    "type": "pg",
+    "name": "Happy homes men's hostel",
+    "rent": 11000,
+    "area": "Kondapur",
+    "lat": 17.463408,
+    "lng": 78.35796,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r12",
+    "type": "pg",
+    "name": "TIRUMALA MENS PG ACCOMODATIONS",
+    "rent": 7000,
+    "area": "Khajaguda",
+    "lat": 17.417758,
+    "lng": 78.337258,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Good wifi, average food, near public transport | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r13",
+    "type": "pg",
+    "name": "NKR luxury mens pg",
+    "rent": 8500,
+    "area": "Kondapur",
+    "lat": 17.455704,
+    "lng": 78.363114,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r14",
+    "type": "pg",
+    "name": "SP Grand Men PG",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.4423,
+    "lng": 78.393294,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Close to metro and e-galleria mall, food not great | Source: community sheet, contributor Anonymous",
+    "link": "tel:9100580404"
+  },
+  {
+    "id": "r15",
+    "type": "pg",
+    "name": "Lavish Livings colive",
+    "rent": 15000,
+    "area": "Madhapur",
+    "lat": 17.449818,
+    "lng": 78.387036,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Mobile signal can be weak | Source: community sheet, contributor Anonymous",
+    "link": "tel:09885741999"
+  },
+  {
+    "id": "r16",
+    "type": "pg",
+    "name": "B.S. Boys Hostel (Myneni apartments on maps)",
+    "rent": 8500,
+    "area": "Begumpet",
+    "lat": 17.44589,
+    "lng": 78.47295,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Near Begumpet metro | Source: community sheet, contributor Anonymous",
+    "link": "tel:+918555009137"
+  },
+  {
+    "id": "r17",
+    "type": "pg",
+    "name": "Happy homes 3rd branch",
+    "rent": 7000,
+    "area": "Kokapet",
+    "lat": 17.411244,
+    "lng": 78.33223,
+    "notes": "Male Only - Four Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Good wifi | Source: community sheet, contributor Anonymous",
+    "link": "tel:9052751778"
+  },
+  {
+    "id": "r18",
+    "type": "pg",
+    "name": "sri krishna varahi boys hostel",
+    "rent": 7000,
+    "area": "Madhapur",
+    "lat": 17.449134,
+    "lng": 78.392172,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | 100m to Durgam Cheruvu metro | Source: community sheet, contributor Anonymous",
+    "link": "tel:7989874729"
+  },
+  {
+    "id": "r19",
+    "type": "pg",
+    "name": "Ayaan Dev Women PG",
+    "rent": 9000,
+    "area": "TNGO Colony",
+    "lat": 17.4601,
+    "lng": 78.347452,
+    "notes": "Female Only - Triple Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Near Indian Bazar home appliance TNGO Colony | Source: community sheet, contributor Anonymous",
+    "link": "tel:9502388666"
+  },
+  {
+    "id": "r20",
+    "type": "pg",
+    "name": "Venkateswara Hostels AC and Non AC",
+    "rent": 7500,
+    "area": "Gowlidoddy",
+    "lat": 17.417616,
+    "lng": 78.35131,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Fridges on every floor, had pest issues per one review | Source: community sheet, contributor Anonymous",
+    "link": "tel:9951325136"
+  },
+  {
+    "id": "r21",
+    "type": "pg",
+    "name": "Elite hostel for men",
+    "rent": 6600,
+    "area": "Dilsukhnagar",
+    "lat": 17.370374,
+    "lng": 78.529278,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Close to Chaitanyapuri metro (<100m) | Source: community sheet, contributor esh0007",
+    "link": "tel:9647327968"
+  },
+  {
+    "id": "r22",
+    "type": "pg",
+    "name": "Regal Vista Co Living",
+    "rent": 15000,
+    "area": "Madhapur",
+    "lat": 17.453508,
+    "lng": 78.38796,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Food good, near Zepto warehouse, weak signal except top floor | Source: community sheet, contributor Anonymous",
+    "link": "tel:7207369966"
+  },
+  {
+    "id": "r23",
+    "type": "pg",
+    "name": "Exotica - Premium Living for Women",
+    "rent": 16500,
+    "area": "Kondapur",
+    "lat": 17.465262,
+    "lng": 78.361086,
+    "notes": "Female Only - Two Sharing | Food 4/5, rating 4/5 | Parking: 2 & 4 Wheeler Parking, Electricity: Separate bill | Gym, lounge each floor, fingerprint security | Source: community sheet, contributor Anonymous",
+    "link": "tel:9088956789"
+  },
+  {
+    "id": "r24",
+    "type": "pg",
+    "name": "Asian Buzz PG",
+    "rent": 16000,
+    "area": "Gowlidoddy",
+    "lat": 17.415714,
+    "lng": 78.359734,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919581553070"
+  },
+  {
+    "id": "r25",
+    "type": "pg",
+    "name": "Sri Kanaka Durga Luxury Men's PG",
+    "rent": 10000,
+    "area": "Kukatpally",
+    "lat": 17.480766,
+    "lng": 78.411412,
+    "notes": "Male Only - Two Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | CCTV, TV, good wifi, near JNTU metro | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919000596431"
+  },
+  {
+    "id": "r26",
+    "type": "pg",
+    "name": "Vihari grand coliving",
+    "rent": 15000,
+    "area": "Madhapur",
+    "lat": 17.44461,
+    "lng": 78.392394,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Ayyappa Society, spacious rooms, gym available | Source: community sheet, contributor Anonymous",
+    "link": "tel:7989425496"
+  },
+  {
+    "id": "r27",
+    "type": "pg",
+    "name": "Vihari prime coliving",
+    "rent": 15000,
+    "area": "Kondapur",
+    "lat": 17.466888,
+    "lng": 78.36216,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:7989425496"
+  },
+  {
+    "id": "r28",
+    "type": "pg",
+    "name": "Stanza Living Lublin House",
+    "rent": 8900,
+    "area": "Maisammaguda",
+    "lat": 17.545876,
+    "lng": 78.419336,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 2/5 | Parking: 4-Wheeler, Electricity: Included in rent | Maintenance poor per review | Source: community sheet, contributor SwimmingMix1064",
+    "link": "tel:8046007444"
+  },
+  {
+    "id": "r29",
+    "type": "pg",
+    "name": "VN Luxury PG",
+    "rent": 8500,
+    "area": "Gowlidoddy",
+    "lat": 17.416428,
+    "lng": 78.360334,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9492123875"
+  },
+  {
+    "id": "r30",
+    "type": "pg",
+    "name": "Regal Vista Co Living (Single)",
+    "rent": 25000,
+    "area": "Madhapur",
+    "lat": 17.44674,
+    "lng": 78.38784,
+    "notes": "Co Living - Single | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Non-AC single; AC single is 30k. Close to 100ft road | Source: community sheet, contributor Anonymous",
+    "link": "tel:7207369966"
+  },
+  {
+    "id": "r31",
+    "type": "pg",
+    "name": "Urban Castle (Alpha) Mens PG",
+    "rent": 7000,
+    "area": "Adibatla",
+    "lat": 17.237066,
+    "lng": 78.55592,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Good wifi, good food | Source: community sheet, contributor Anonymous",
+    "link": "tel:9441962896"
+  },
+  {
+    "id": "r32",
+    "type": "pg",
+    "name": "Ira Women's PG",
+    "rent": 9000,
+    "area": "Kukatpally",
+    "lat": 17.480838,
+    "lng": 78.409456,
+    "notes": "Female Only - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Night security, small gym, bus stop 200m, metro within 1km | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919030316747"
+  },
+  {
+    "id": "r33",
+    "type": "pg",
+    "name": "KSR Mens PG",
+    "rent": 11000,
+    "area": "Madhapur",
+    "lat": 17.451144,
+    "lng": 78.386382,
+    "notes": "Male Only - Two Sharing | Food 1/5, rating 2/5 | Parking: No Parking, Electricity: Included in rent | Slow wifi, no security guard | Source: community sheet, contributor Anonymous",
+    "link": "tel:9963850287"
+  },
+  {
+    "id": "r34",
+    "type": "pg",
+    "name": "Universe pg coliving",
+    "rent": 9000,
+    "area": "Madhapur",
+    "lat": 17.44725,
+    "lng": 78.386862,
+    "notes": "Co Living - Triple Sharing | Food 1/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Good wifi, gym, EV charging | Source: community sheet, contributor Anonymous",
+    "link": "tel:8499926777"
+  },
+  {
+    "id": "r35",
+    "type": "pg",
+    "name": "Nandu MensPG",
+    "rent": 16000,
+    "area": "Hitec City",
+    "lat": 17.438274,
+    "lng": 78.372208,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | No amenities, total with extras ~18-19k | Source: community sheet, contributor Anonymous",
+    "link": "tel:8885885041"
+  },
+  {
+    "id": "r36",
+    "type": "pg",
+    "name": "Aditya landmark (Laxmi Nivas)",
+    "rent": 10000,
+    "area": "Somajiguda",
+    "lat": 17.420054,
+    "lng": 78.451868,
+    "notes": "Female Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 4-Wheeler, Electricity: Included in rent | Gated community | Source: community sheet, contributor Anonymous",
+    "link": "tel:7799375348"
+  },
+  {
+    "id": "r37",
+    "type": "pg",
+    "name": "Leonar Hotel",
+    "rent": 12000,
+    "area": "Kokapet",
+    "lat": 17.409852,
+    "lng": 78.332872,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: 4-Wheeler, Electricity: Included in rent | Hotel that also offers PG option | Source: community sheet, contributor Anonymous",
+    "link": "tel:8185818777"
+  },
+  {
+    "id": "r38",
+    "type": "pg",
+    "name": "The Nest Hostel And PG Accommodation",
+    "rent": 7000,
+    "area": "Uppal",
+    "lat": 17.400862,
+    "lng": 78.561946,
+    "notes": "Co Living - Single | Food 4/5, rating 4/5 | Parking: 4-Wheeler, Electricity: Included in rent | Near Nagole metro, gym available | Source: community sheet, contributor Anonymous",
+    "link": "tel:8008701863"
+  },
+  {
+    "id": "r39",
+    "type": "pg",
+    "name": "Star pg single rooms",
+    "rent": 21000,
+    "area": "Madhapur",
+    "lat": 17.448012,
+    "lng": 78.389814,
+    "notes": "Co Living - Single | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Fully furnished, AC, sofa, fridge | Source: community sheet, contributor Anonymous",
+    "link": "tel:+918639569905"
+  },
+  {
+    "id": "r40",
+    "type": "pg",
+    "name": "The Nest Hostel And PG (2 sharing)",
+    "rent": 13500,
+    "area": "Uppal",
+    "lat": 17.397238,
+    "lng": 78.56143,
+    "notes": "Co Living - Single | Food 4/5, rating 4/5 | Parking: Parking available, Electricity: Included in rent | Plot 291, Aruna Nilayam, Uppal Bhagayat, HMDA Layout Rd, Uppal, Hyderabad 500039; near Nagole/Uppal metro | Source: community sheet, contributor ComprehensivePie3081",
+    "link": "tel:+918008701863"
+  },
+  {
+    "id": "r41",
+    "type": "pg",
+    "name": "Aparaajitha Padmarao nagar",
+    "rent": 12850,
+    "area": "Padmarao Nagar",
+    "lat": 17.414004,
+    "lng": 78.49848,
+    "notes": "Female Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9849799709"
+  },
+  {
+    "id": "r42",
+    "type": "pg",
+    "name": "Lotus co-living madhapur",
+    "rent": 12500,
+    "area": "Madhapur",
+    "lat": 17.445576,
+    "lng": 78.38691,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Good locality, all included | Source: community sheet, contributor Anonymous",
+    "link": "tel:8500282719"
+  },
+  {
+    "id": "r43",
+    "type": "pg",
+    "name": "Elysian Coliving",
+    "rent": 16000,
+    "area": "Madhapur",
+    "lat": 17.444262,
+    "lng": 78.396132,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9088373839"
+  },
+  {
+    "id": "r44",
+    "type": "pg",
+    "name": "Isha coliving",
+    "rent": 15000,
+    "area": "Indira Nagar",
+    "lat": 17.438522,
+    "lng": 78.465738,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Good surrounding amenities | Source: community sheet, contributor Stupefy_me",
+    "link": "tel:9989364345"
+  },
+  {
+    "id": "r45",
+    "type": "pg",
+    "name": "Sri Sai surya luxury mens pg",
+    "rent": 6500,
+    "area": "Gachibowli",
+    "lat": 17.440712,
+    "lng": 78.35433,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9573653799"
+  },
+  {
+    "id": "r46",
+    "type": "pg",
+    "name": "Nandu mens PG (Triple)",
+    "rent": 15000,
+    "area": "Hitec City",
+    "lat": 17.44464,
+    "lng": 78.380536,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9705326054"
+  },
+  {
+    "id": "r47",
+    "type": "pg",
+    "name": "Sri sai nilayam mens pg",
+    "rent": 8500,
+    "area": "Hitec City",
+    "lat": 17.44455,
+    "lng": 78.378046,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Good food, friendly staff | Source: community sheet, contributor Anonymous",
+    "link": "tel:6305822967"
+  },
+  {
+    "id": "r48",
+    "type": "pg",
+    "name": "Sai rama men's PG",
+    "rent": 7500,
+    "area": "JNTU",
+    "lat": 17.498574,
+    "lng": 78.386736,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Good food, congested, hot water 24/7 | Source: community sheet, contributor /u/Ghost_face008",
+    "link": "tel:+917660077821"
+  },
+  {
+    "id": "r49",
+    "type": "pg",
+    "name": "Om sri Vigneshwara thirumala women's pg",
+    "rent": 10500,
+    "area": "Madhapur",
+    "lat": 17.447898,
+    "lng": 78.395226,
+    "notes": "Female Only - Triple Sharing | Food 2/5, rating 2/5 | Parking: No Parking, Electricity: Separate bill | Average food, slow wifi, rude management per review | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r50",
+    "type": "pg",
+    "name": "Thrive Living",
+    "rent": 16000,
+    "area": "Madhapur",
+    "lat": 17.452656,
+    "lng": 78.385932,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: Available for both, Electricity: Separate bill | Food extra, homely stay | Source: community sheet, contributor Dizzy_Preference",
+    "link": "tel:9618386367"
+  },
+  {
+    "id": "r51",
+    "type": "pg",
+    "name": "Sri Lakshmi Men's PG & Guest Inn",
+    "rent": 9000,
+    "area": "Gachibowli",
+    "lat": 17.436452,
+    "lng": 78.354246,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Decent food, internet works well | Source: community sheet, contributor guptasaurav850",
+    "link": "tel:9542894017"
+  },
+  {
+    "id": "r52",
+    "type": "pg",
+    "name": "GSR Executive gents hostel",
+    "rent": 8500,
+    "area": "Hitec City",
+    "lat": 17.445342,
+    "lng": 78.378568,
+    "notes": "Male Only - Triple Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9966940328"
+  },
+  {
+    "id": "r53",
+    "type": "pg",
+    "name": "Amulya Grand PG for men",
+    "rent": 8500,
+    "area": "Gachibowli",
+    "lat": 17.44598,
+    "lng": 78.351114,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Cleaned daily | Source: community sheet, contributor Anonymous",
+    "link": "tel:+917059057777"
+  },
+  {
+    "id": "r54",
+    "type": "pg",
+    "name": "Shashi kumar boys hostel",
+    "rent": 4500,
+    "area": "Amberpet",
+    "lat": 17.390428,
+    "lng": 78.512926,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Near public transport | Source: community sheet, contributor Anonymous",
+    "link": "tel:9959888962"
+  },
+  {
+    "id": "r55",
+    "type": "pg",
+    "name": "Aspire co living PG",
+    "rent": 15000,
+    "area": "Gachibowli",
+    "lat": 17.4431,
+    "lng": 78.348258,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9991242499"
+  },
+  {
+    "id": "r56",
+    "type": "pg",
+    "name": "SRI LAKSHMI BALAJI GUEST INN AND PG FOR MEN",
+    "rent": 7500,
+    "area": "Hitec City",
+    "lat": 17.44692,
+    "lng": 78.37966,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Veg/non-veg food 3x/day; 2-share 9k, 3-share 7.5k, 4-share 6.5k | Source: community sheet, contributor u/Ill-Equivalent-6564",
+    "link": "tel:07207297111"
+  },
+  {
+    "id": "r57",
+    "type": "pg",
+    "name": "R3 luxeloom colive",
+    "rent": 120000,
+    "area": "Madhapur",
+    "lat": 17.444382,
+    "lng": 78.3897,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 4/5 | Parking: 4-Wheeler, Electricity: Separate bill | Free gym — rent looks unusually high, possible data entry error, verify | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919796999696"
+  },
+  {
+    "id": "r58",
+    "type": "pg",
+    "name": "CozyStay by Curryman",
+    "rent": 17500,
+    "area": "Gachibowli",
+    "lat": 17.44304,
+    "lng": 78.345426,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: Parking outside PG, Electricity: Separate bill | PG+restaurant, daily cleaning, fingerprint entry | Source: community sheet, contributor Anonymous",
+    "link": "tel:7995050606"
+  },
+  {
+    "id": "r59",
+    "type": "pg",
+    "name": "Prasanth Luxury Men's PG",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.452254,
+    "lng": 78.396102,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Near Ayyappa Society main market road | Source: community sheet, contributor Cultural_Wishbone_78",
+    "link": "tel:9000039502"
+  },
+  {
+    "id": "r60",
+    "type": "pg",
+    "name": "Hack n sleep",
+    "rent": 16000,
+    "area": "Gachibowli",
+    "lat": 17.445614,
+    "lng": 78.351852,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Close to Mindspace, DLF street, Dmart/Sarath | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919390843772"
+  },
+  {
+    "id": "r61",
+    "type": "pg",
+    "name": "Aadhya Colive PG",
+    "rent": 8500,
+    "area": "Gowlidoddy",
+    "lat": 17.414538,
+    "lng": 78.349822,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9154146149"
+  },
+  {
+    "id": "r62",
+    "type": "pg",
+    "name": "Manish Reddy Mens Guest Inn",
+    "rent": 8000,
+    "area": "Kokapet",
+    "lat": 17.407056,
+    "lng": 78.323374,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Near GAR towers, developing area | Source: community sheet, contributor Anonymous",
+    "link": "tel:9032693137"
+  },
+  {
+    "id": "r63",
+    "type": "pg",
+    "name": "Gemini Luxury Stay Men's PG",
+    "rent": 9000,
+    "area": "Madhapur",
+    "lat": 17.442384,
+    "lng": 78.388386,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9424449777"
+  },
+  {
+    "id": "r64",
+    "type": "pg",
+    "name": "Venkata Sai Men's Hostel",
+    "rent": 9000,
+    "area": "Nanakramguda",
+    "lat": 17.418534,
+    "lng": 78.353824,
+    "notes": "Male Only - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Behind Waverock building | Source: community sheet, contributor Anonymous",
+    "link": "tel:9844722219"
+  },
+  {
+    "id": "r65",
+    "type": "pg",
+    "name": "Babai premium co-living space",
+    "rent": 10500,
+    "area": "Gachibowli",
+    "lat": 17.437634,
+    "lng": 78.343998,
+    "notes": "Co Living - Triple Sharing | Food 4/5, rating 4/5 | Parking: No Parking, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9492924138"
+  },
+  {
+    "id": "r66",
+    "type": "pg",
+    "name": "KARAN Luxury co-living",
+    "rent": 16000,
+    "area": "Gachibowli",
+    "lat": 17.443202,
+    "lng": 78.347844,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Food, wifi, laundry, gym, gaming zone | Source: community sheet, contributor Anonymous",
+    "link": "tel:9057994999"
+  },
+  {
+    "id": "r67",
+    "type": "pg",
+    "name": "myra luxury co-living",
+    "rent": 17000,
+    "area": "Gachibowli",
+    "lat": 17.439518,
+    "lng": 78.34947,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Gym, balcony, box cricket | Source: community sheet, contributor Myra living",
+    "link": "tel:9057994999"
+  },
+  {
+    "id": "r68",
+    "type": "pg",
+    "name": "Housr coliving 50",
+    "rent": 30500,
+    "area": "Kondapur",
+    "lat": 17.456052,
+    "lng": 78.369432,
+    "notes": "Co Living - Single | Food 2/5, rating 4/5 | Parking: 4-Wheeler, Electricity: Separate bill | Wifi/housekeeping/laundry/breakfast+dinner included, prepaid electricity | Source: community sheet, contributor Anonymous",
+    "link": "tel:09090908778"
+  },
+  {
+    "id": "r69",
+    "type": "pg",
+    "name": "BLISS Mens PG & Hostel",
+    "rent": 11000,
+    "area": "Gachibowli",
+    "lat": 17.435492,
+    "lng": 78.35337,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Gym available | Source: community sheet, contributor Anonymous",
+    "link": "tel:9966608088"
+  },
+  {
+    "id": "r70",
+    "type": "pg",
+    "name": "Bro PG",
+    "rent": 7500,
+    "area": "Gowlidoddy",
+    "lat": 17.414388,
+    "lng": 78.357178,
+    "notes": "Co Living - Four Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:+918886988898"
+  },
+  {
+    "id": "r71",
+    "type": "pg",
+    "name": "sri harsha mens PG",
+    "rent": 7500,
+    "area": "Madhapur",
+    "lat": 17.442576,
+    "lng": 78.392856,
+    "notes": "Male Only - Four Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9391385307"
+  },
+  {
+    "id": "r72",
+    "type": "pg",
+    "name": "My space pg for gents",
+    "rent": 10000,
+    "area": "SR Nagar",
+    "lat": 17.446704,
+    "lng": 78.45042,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Timevolume",
+    "link": "tel:9490513971"
+  },
+  {
+    "id": "r73",
+    "type": "pg",
+    "name": "My Space Men's PG (Executive branch)",
+    "rent": 7000,
+    "area": "Madhura Nagar",
+    "lat": 17.438124,
+    "lng": 78.450172,
+    "notes": "Male Only - Five Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Between 3 metro stations, mostly students | Source: community sheet, contributor SpiritedBeyond",
+    "link": "tel:9490513971"
+  },
+  {
+    "id": "r74",
+    "type": "pg",
+    "name": "Sravya Elite Stay for Women",
+    "rent": 14000,
+    "area": "Madhapur",
+    "lat": 17.445564,
+    "lng": 78.38565,
+    "notes": "Female Only - Two Sharing | Food 3/5, rating 3/5 | Parking: No Parking, Electricity: Separate bill | 14k for AC 2-share, prepaid electricity | Source: community sheet, contributor Anonymous",
+    "link": "tel:7799059599"
+  },
+  {
+    "id": "r75",
+    "type": "pg",
+    "name": "Prime pg",
+    "rent": 12000,
+    "area": "Financial District",
+    "lat": 17.418598,
+    "lng": 78.341656,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: Empty site next to it, Electricity: Separate bill | North/south food, daily cleaning | Source: community sheet, contributor Anonymous",
+    "link": "tel:+918121815858"
+  },
+  {
+    "id": "r76",
+    "type": "pg",
+    "name": "Prime north",
+    "rent": 20000,
+    "area": "Financial District",
+    "lat": 17.419786,
+    "lng": 78.343414,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Close to Financial District / Nanakramguda / Gowlidoddy | Source: community sheet, contributor Anonymous",
+    "link": "tel:+918121815858"
+  },
+  {
+    "id": "r77",
+    "type": "pg",
+    "name": "Sri Sai Nilayam Men's PG",
+    "rent": 10000,
+    "area": "Hitec City",
+    "lat": 17.442312,
+    "lng": 78.379486,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9986008989"
+  },
+  {
+    "id": "r78",
+    "type": "pg",
+    "name": "Irasad PG & Kitchen",
+    "rent": 4000,
+    "area": "Singapore Township, Pocharam",
+    "lat": 17.527062,
+    "lng": 78.592132,
+    "notes": "Co Living - Triple Sharing | Food 5/5, rating 5/5 | Parking: 4-Wheeler, Electricity: Separate bill | Near Infosys SEZ campus, Mindspace East | Source: community sheet, contributor Anonymous",
+    "link": "tel:7893664987"
+  },
+  {
+    "id": "r79",
+    "type": "pg",
+    "name": "Green Homes Coliving Elite",
+    "rent": 13000,
+    "area": "Kondapur",
+    "lat": 17.465046,
+    "lng": 78.36363,
+    "notes": "Co Living - Triple Sharing | Food 5/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Gym, monthly food fest, had a bed bug issue per review | Source: community sheet, contributor Anonymous",
+    "link": "tel:7674935066"
+  },
+  {
+    "id": "r80",
+    "type": "pg",
+    "name": "JURY'S LUXURY, CO-LIVING & MEN'S HOSTEL",
+    "rent": 10000,
+    "area": "Kokapet",
+    "lat": 17.417178,
+    "lng": 78.32332,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 5/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Fast wifi, mini gym | Source: community sheet, contributor Anonymous",
+    "link": "tel:6305444614"
+  },
+  {
+    "id": "r81",
+    "type": "pg",
+    "name": "Sai Kuteer Co-Live",
+    "rent": 17000,
+    "area": "Hitec City",
+    "lat": 17.44005,
+    "lng": 78.373258,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:6309413006"
+  },
+  {
+    "id": "r82",
+    "type": "pg",
+    "name": "Sri Durga Bhairava Men's PG and Hostel",
+    "rent": 7500,
+    "area": "Kondapur",
+    "lat": 17.461116,
+    "lng": 78.358452,
+    "notes": "Male Only - Triple Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Long-time resident review, kitchen hygiene concerns | Source: community sheet, contributor u/Kind-Chance8571",
+    "link": "tel:8985201474"
+  },
+  {
+    "id": "r83",
+    "type": "pg",
+    "name": "VR Destiny PG",
+    "rent": 14500,
+    "area": "Madhapur",
+    "lat": 17.448606,
+    "lng": 78.391932,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9490490808"
+  },
+  {
+    "id": "r84",
+    "type": "pg",
+    "name": "Satyam Boys pg hostel",
+    "rent": 6500,
+    "area": "Kukatpally",
+    "lat": 17.481642,
+    "lng": 78.408172,
+    "notes": "Male Only - Four Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9515786727"
+  },
+  {
+    "id": "r85",
+    "type": "pg",
+    "name": "Sri lakshmi deluxe hostel",
+    "rent": 8000,
+    "area": "Suchitra",
+    "lat": 17.524012,
+    "lng": 78.439936,
+    "notes": "Female Only - Triple Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r86",
+    "type": "pg",
+    "name": "Madineni Co-Living",
+    "rent": 10500,
+    "area": "Kukatpally",
+    "lat": 17.483592,
+    "lng": 78.411364,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Common cooking area, average food | Source: community sheet, contributor Anonymous",
+    "link": "tel:9390027099"
+  },
+  {
+    "id": "r87",
+    "type": "pg",
+    "name": "Rohan Mens PG",
+    "rent": 9000,
+    "area": "Gachibowli",
+    "lat": 17.441816,
+    "lng": 78.35379,
+    "notes": "Male Only - Two Sharing | Food 5/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Near AMB mall, Raidurg metro, walkable to Gachibowli X roads | Source: community sheet, contributor Anonymous",
+    "link": "tel:7799996731"
+  },
+  {
+    "id": "r88",
+    "type": "pg",
+    "name": "Sri sukh sagar men's pg",
+    "rent": 13500,
+    "area": "Gowlidoddy",
+    "lat": 17.417118,
+    "lng": 78.354358,
+    "notes": "Male Only - Two Sharing | Food 4/5, rating 3/5 | Parking: Space in front of PG, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r89",
+    "type": "pg",
+    "name": "Sravya Elite Stay for women (2)",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.449494,
+    "lng": 78.393228,
+    "notes": "Female Only - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Treadmill, cycle, dumbbells, metro 1km | Source: community sheet, contributor tricky_cat_57",
+    "link": "tel:+917799059579"
+  },
+  {
+    "id": "r90",
+    "type": "pg",
+    "name": "Narenn Pinnacle",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.452482,
+    "lng": 78.389136,
+    "notes": "Co Living - Four Sharing | Food 5/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor u/vinodpolinati",
+    "link": "tel:09848779495"
+  },
+  {
+    "id": "r91",
+    "type": "pg",
+    "name": "Sree Lakshmi Heaven's Men's PG",
+    "rent": 9000,
+    "area": "Madhapur",
+    "lat": 17.448114,
+    "lng": 78.388674,
+    "notes": "Male Only - Triple Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Wifi 45mbps, good food | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919963485888"
+  },
+  {
+    "id": "r92",
+    "type": "pg",
+    "name": "venkata sai luxury men's hostel",
+    "rent": 9000,
+    "area": "Nanakramguda",
+    "lat": 17.419416,
+    "lng": 78.356752,
+    "notes": "Male Only - Two Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Near Hitec City/Nanakramguda/Waverock bus stands, wifi 100mbps | Source: community sheet, contributor Anonymous",
+    "link": "tel:9844722219"
+  },
+  {
+    "id": "r93",
+    "type": "pg",
+    "name": "Lotus coliving (2)",
+    "rent": 10000,
+    "area": "Madhapur",
+    "lat": 17.451396,
+    "lng": 78.389532,
+    "notes": "Co Living - Triple Sharing | Food 4/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:8500282718"
+  },
+  {
+    "id": "r94",
+    "type": "pg",
+    "name": "GALA Living",
+    "rent": 16000,
+    "area": "Madhapur",
+    "lat": 17.44797,
+    "lng": 78.390522,
+    "notes": "Co Living - Triple Sharing | Food 4/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Gym okay, lunch prepared at noon | Source: community sheet, contributor Anonymous",
+    "link": "tel:09912222989"
+  },
+  {
+    "id": "r95",
+    "type": "pg",
+    "name": "Balcony Blush Co-Living PG",
+    "rent": 11500,
+    "area": "Madhapur",
+    "lat": 17.450442,
+    "lng": 78.395484,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | New, well-maintained, wifi slow on lower floors | Source: community sheet, contributor Anonymous",
+    "link": "tel:9063666482"
+  },
+  {
+    "id": "r96",
+    "type": "pg",
+    "name": "MANIKANTA LUXURY MEN'S HOSTEL - KPHB",
+    "rent": 8000,
+    "area": "KPHB",
+    "lat": 17.489932,
+    "lng": 78.404426,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | North Indian food, room cleaning daily | Source: community sheet, contributor Anonymous",
+    "link": "tel:7416003488"
+  },
+  {
+    "id": "r97",
+    "type": "pg",
+    "name": "SRI VIVEKANANDA LUXURY PG ACCOMMODATION",
+    "rent": 8000,
+    "area": "KPHB",
+    "lat": 17.49133,
+    "lng": 78.399464,
+    "notes": "Male Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | 4-share spacious, 3-share average | Source: community sheet, contributor Anonymous",
+    "link": "tel:8978637889"
+  },
+  {
+    "id": "r98",
+    "type": "pg",
+    "name": "Ankura PG",
+    "rent": 11000,
+    "area": "Nanakramguda",
+    "lat": 17.423388,
+    "lng": 78.355204,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: No Parking, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9502340466"
+  },
+  {
+    "id": "r99",
+    "type": "pg",
+    "name": "Dhruva executive coliving pg",
+    "rent": 10000,
+    "area": "Gachibowli",
+    "lat": 17.440268,
+    "lng": 78.343998,
+    "notes": "Co Living - Two Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Limited food, self cooking available | Source: community sheet, contributor Anonymous",
+    "link": "tel:9666806079"
+  },
+  {
+    "id": "r100",
+    "type": "pg",
+    "name": "RR Premium Coliving",
+    "rent": 12000,
+    "area": "Madhapur",
+    "lat": 17.45178,
+    "lng": 78.386016,
+    "notes": "Co Living - Triple Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | Rotis daily, good owners | Source: community sheet, contributor Anonymous",
+    "link": "tel:8790721999"
+  },
+  {
+    "id": "r101",
+    "type": "pg",
+    "name": "Hostelnest Men's and Co-living Space",
+    "rent": 10000,
+    "area": "Kondapur",
+    "lat": 17.464422,
+    "lng": 78.368154,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | 1km from Sarath City Mall | Source: community sheet, contributor North_Elk_8034",
+    "link": "tel:8179035061"
+  },
+  {
+    "id": "r102",
+    "type": "pg",
+    "name": "Star PG Coliving",
+    "rent": 16000,
+    "area": "Durgam Cheruvu",
+    "lat": 17.428788,
+    "lng": 78.394538,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Beside Durgam Cheruvu lake, metro connected | Source: community sheet, contributor Anonymous",
+    "link": "tel:7893374934"
+  },
+  {
+    "id": "r103",
+    "type": "pg",
+    "name": "Asian Living Coliving",
+    "rent": 16000,
+    "area": "Gowlidoddy",
+    "lat": 17.412822,
+    "lng": 78.350788,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Source: community sheet, contributor ExpressionDesigner30",
+    "link": "tel:9133895776"
+  },
+  {
+    "id": "r104",
+    "type": "pg",
+    "name": "Cuddles Colive",
+    "rent": 15000,
+    "area": "Madhapur",
+    "lat": 17.443038,
+    "lng": 78.394956,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 4-Wheeler, Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:9948801666"
+  },
+  {
+    "id": "r105",
+    "type": "pg",
+    "name": "Kondapur Single Coliving",
+    "rent": 21000,
+    "area": "Kondapur",
+    "lat": 17.46591,
+    "lng": 78.35877,
+    "notes": "Co Living - Single | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | No study table, no induction stove | Source: community sheet, contributor Anonymous",
+    "link": "tel:6301810107"
+  },
+  {
+    "id": "r106",
+    "type": "pg",
+    "name": "GNR Mens PG",
+    "rent": 5000,
+    "area": "SR Nagar",
+    "lat": 17.437722,
+    "lng": 78.447204,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Wifi 200mbps | Source: community sheet, contributor u/quick_techie",
+    "link": "tel:7702402407"
+  },
+  {
+    "id": "r107",
+    "type": "pg",
+    "name": "Sai Balaji Deluxe PG",
+    "rent": 8500,
+    "area": "SR Nagar",
+    "lat": 17.44482,
+    "lng": 78.446268,
+    "notes": "Male Only - Triple Sharing | Food 2/5, rating 2/5 | Parking: 2-Wheeler, Electricity: Included in rent | Negative review on cleanliness | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r108",
+    "type": "pg",
+    "name": "Shree Venkata Balaji men's hostel",
+    "rent": 7500,
+    "area": "Gowlidoddy",
+    "lat": 17.414316,
+    "lng": 78.359044,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9398873897"
+  },
+  {
+    "id": "r109",
+    "type": "pg",
+    "name": "Aadhya Elite PG",
+    "rent": 12500,
+    "area": "Hitec City",
+    "lat": 17.440374,
+    "lng": 78.379648,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | No gym/TT table | Source: community sheet, contributor Anonymous",
+    "link": "tel:9888878899"
+  },
+  {
+    "id": "r110",
+    "type": "pg",
+    "name": "Zolo Lotus",
+    "rent": 8800,
+    "area": "Madhapur",
+    "lat": 17.453538,
+    "lng": 78.392412,
+    "notes": "Co Living - Triple Sharing | Food 1/5, rating 1/5 | Parking: 4-Wheeler, Electricity: Separate bill | Food not provided; poor maintenance per Feb 2026 review | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r111",
+    "type": "pg",
+    "name": "Sri Vineela Executive Women's Hostel PG",
+    "rent": 11000,
+    "area": "Gowlidoddy",
+    "lat": 17.42205,
+    "lng": 78.35167,
+    "notes": "Female Only - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Close to main road, well lit | Source: community sheet, contributor Anonymous",
+    "link": "tel:9177245468"
+  },
+  {
+    "id": "r112",
+    "type": "pg",
+    "name": "Sri Ganga Residency Luxury Men's and Women's PG",
+    "rent": 10000,
+    "area": "Gachibowli",
+    "lat": 17.444402,
+    "lng": 78.34359,
+    "notes": "Male Only - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Siddique Nagar Gachibowli, 3x food included, new building | Source: community sheet, contributor u/killerbee182",
+    "link": "tel:9346818393"
+  },
+  {
+    "id": "r113",
+    "type": "pg",
+    "name": "Nexin PG for Ladies",
+    "rent": 8500,
+    "area": "Hitec City",
+    "lat": 17.441802,
+    "lng": 78.37258,
+    "notes": "Female Only - Triple Sharing | Food 2/5, rating 2/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Source: community sheet, contributor Anonymous",
+    "link": "tel:8340833003"
+  },
+  {
+    "id": "r114",
+    "type": "pg",
+    "name": "Helios/Hilton Colive PG and Guest Inn",
+    "rent": 12500,
+    "area": "Madhapur",
+    "lat": 17.444676,
+    "lng": 78.386766,
+    "notes": "Co Living - Two Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | No additional cost | Source: community sheet, contributor Anonymous",
+    "link": "tel:9949139910"
+  },
+  {
+    "id": "r115",
+    "type": "pg",
+    "name": "Prema Nivas",
+    "rent": 21000,
+    "area": "Hitec City",
+    "lat": 17.439924,
+    "lng": 78.379552,
+    "notes": "Co Living - Two Sharing | Food 5/5, rating 5/5 | Parking: 4-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r116",
+    "type": "pg",
+    "name": "Laxmi women's PG and Hostel",
+    "rent": 13000,
+    "area": "Gachibowli",
+    "lat": 17.445974,
+    "lng": 78.354846,
+    "notes": "Female Only - Two Sharing | Food 1/5, rating 1/5 | Parking: No Parking, Electricity: Included in rent | Negative review: management and maintenance concerns | Source: community sheet, contributor Anonymous",
+    "link": "tel:9989673769"
+  },
+  {
+    "id": "r117",
+    "type": "pg",
+    "name": "Sandhya Reddy Boys Hostel",
+    "rent": 6000,
+    "area": "Dilsukhnagar",
+    "lat": 17.3648,
+    "lng": 78.521388,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r118",
+    "type": "pg",
+    "name": "Delhiwala mens pg",
+    "rent": 22000,
+    "area": "Gowlidoddy",
+    "lat": 17.419974,
+    "lng": 78.349138,
+    "notes": "Male Only - Single | Food 5/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Hot rotis served, good for vegetarians; rent shown as shorthand in source, treated as 22k | Source: community sheet, contributor Anonymous",
+    "link": "tel:+919885141696"
+  },
+  {
+    "id": "r119",
+    "type": "pg",
+    "name": "Raghavendra Mens PG",
+    "rent": 11500,
+    "area": "Gachibowli",
+    "lat": 17.442746,
+    "lng": 78.34407,
+    "notes": "Male Only - Two Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:9700114227"
+  },
+  {
+    "id": "r120",
+    "type": "pg",
+    "name": "Exotica Elite Luxury Men's PG",
+    "rent": 12500,
+    "area": "Kondapur",
+    "lat": 17.4624,
+    "lng": 78.365892,
+    "notes": "Male Only - Triple Sharing | Food 5/5, rating 5/5 | Parking: 2-Wheeler, Electricity: Separate bill | New PG, near Kondapur junction, good food | Source: community sheet, contributor Anonymous",
+    "link": "tel:7797798888"
+  },
+  {
+    "id": "r121",
+    "type": "pg",
+    "name": "Stanza living bremen house",
+    "rent": 10700,
+    "area": "Gachibowli",
+    "lat": 17.437784,
+    "lng": 78.353298,
+    "notes": "Co Living - Triple Sharing | Food 3/5, rating 2/5 | Parking: No Parking, Electricity: Separate bill | Onboarding/exit fee, bed bug issue per review | Source: community sheet, contributor Anonymous",
+    "link": "tel:7337044386"
+  },
+  {
+    "id": "r122",
+    "type": "pg",
+    "name": "SR MEN'S PG",
+    "rent": 9500,
+    "area": "Gachibowli",
+    "lat": 17.44502,
+    "lng": 78.34899,
+    "notes": "Male Only - Two Sharing | Food 2/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Near Deloitte, Tech Mahindra, Sarath City Mall | Source: community sheet, contributor Anonymous",
+    "link": "tel:8309237011"
+  },
+  {
+    "id": "r123",
+    "type": "pg",
+    "name": "Shanvitha executive women's hostel",
+    "rent": 8500,
+    "area": "Madhapur",
+    "lat": 17.44698,
+    "lng": 78.385692,
+    "notes": "Female Only - Four Sharing | Food 3/5, rating 4/5 | Parking: Spacious parking, Electricity: Separate bill | Near Durgam Cheruvu metro | Source: community sheet, contributor Anonymous",
+    "link": "tel:8885100049"
+  },
+  {
+    "id": "r124",
+    "type": "pg",
+    "name": "SVN hills mens pg, Lumbini Avenue",
+    "rent": 10500,
+    "area": "Gachibowli",
+    "lat": 17.442062,
+    "lng": 78.352392,
+    "notes": "Male Only - Triple Sharing | Food 2/5, rating 2/5 | Parking: 2-Wheeler, Electricity: Separate bill | Negative review: extra AC charges in summer | Source: community sheet, contributor Anonymous",
+    "link": "tel:+917780718806"
+  },
+  {
+    "id": "r125",
+    "type": "pg",
+    "name": "Srinivasa women's pg",
+    "rent": 11000,
+    "area": "Nanakramguda",
+    "lat": 17.421192,
+    "lng": 78.355006,
+    "notes": "Female Only - Two Sharing | Food 3/5, rating 2/5 | Parking: No Parking, Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": "tel:7997169520"
+  },
+  {
+    "id": "r126",
+    "type": "pg",
+    "name": "Isha Co-living pg",
+    "rent": 14500,
+    "area": "Gachibowli",
+    "lat": 17.435486,
+    "lng": 78.351768,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: No Parking, Electricity: Separate bill | Near Karachi Bakery, Paradise, Pullela Gopichand Academy; lunch extra on weekdays | Source: community sheet, contributor Anonymous",
+    "link": "tel:7093180342"
+  },
+  {
+    "id": "r127",
+    "type": "pg",
+    "name": "Delight Inn Coliving PG",
+    "rent": 13500,
+    "area": "Gachibowli",
+    "lat": 17.441162,
+    "lng": 78.34512,
+    "notes": "Co Living - Two Sharing | Food 3/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Average food, two washing machines, non-AC twin ~9k | Source: community sheet, contributor Anonymous",
+    "link": "tel:8118069124"
+  },
+  {
+    "id": "r128",
+    "type": "pg",
+    "name": "Westside Coliving PG",
+    "rent": 15000,
+    "area": "Madhapur",
+    "lat": 17.448588,
+    "lng": 78.39738,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Good breakfast/dinner, small gym | Source: community sheet, contributor Anonymous",
+    "link": "tel:9059434949"
+  },
+  {
+    "id": "r129",
+    "type": "pg",
+    "name": "Ojas Deluxe PG",
+    "rent": 16500,
+    "area": "Shamshabad",
+    "lat": 17.234882,
+    "lng": 78.429616,
+    "notes": "Co Living - Single | Food 5/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | No washing machine, housekeeper washes clothes | Source: community sheet, contributor Anonymous",
+    "link": "tel:9701018032"
+  },
+  {
+    "id": "r130",
+    "type": "pg",
+    "name": "YS Luxury Coliving PG",
+    "rent": 21000,
+    "area": "Kondapur",
+    "lat": 17.456466,
+    "lng": 78.361074,
+    "notes": "Co Living - Single | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | No study table, no induction stove | Source: community sheet, contributor Anonymous",
+    "link": "tel:6301810107"
+  },
+  {
+    "id": "r131",
+    "type": "pg",
+    "name": "Green Homes Coliving Pearl",
+    "rent": 20000,
+    "area": "Kondapur",
+    "lat": 17.45892,
+    "lng": 78.368694,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Gym, pool, table tennis, smoking area, study area | Source: community sheet, contributor Anonymous",
+    "link": "tel:8978469873"
+  },
+  {
+    "id": "r132",
+    "type": "pg",
+    "name": "ApnaGhar",
+    "rent": 23000,
+    "area": "Gowlidoddy",
+    "lat": 17.414148,
+    "lng": 78.356308,
+    "notes": "Co Living - Single | Food 4/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Veg rotis served at Delhi Walla PG kitchen; washing machine issues | Source: community sheet, contributor Anonymous",
+    "link": "tel:9885141696"
+  },
+  {
+    "id": "r133",
+    "type": "pg",
+    "name": "Z inn Premium Living",
+    "rent": 16000,
+    "area": "Khajaguda",
+    "lat": 17.408794,
+    "lng": 78.339304,
+    "notes": "Co Living - Two Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Separate bill | Central to Gachibowli, Financial District, Jubilee Hills | Source: community sheet, contributor Anonymous",
+    "link": "tel:9000180202"
+  },
+  {
+    "id": "r134",
+    "type": "pg",
+    "name": "7 hills pg for womens",
+    "rent": 8000,
+    "area": "Kondapur",
+    "lat": 17.458044,
+    "lng": 78.368694,
+    "notes": "Female Only - Triple Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler, Electricity: Included in rent | Good food and wifi | Source: community sheet, contributor Anonymous",
+    "link": "tel:9492755441"
+  },
+  {
+    "id": "r135",
+    "type": "pg",
+    "name": "Nextgen group of hostels",
+    "rent": 8000,
+    "area": "Gachibowli",
+    "lat": 17.43431,
+    "lng": 78.350328,
+    "notes": "Co Living - Five Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Gym, transport provided | Source: community sheet, contributor Anonymous",
+    "link": "tel:9985008096"
+  },
+  {
+    "id": "r136",
+    "type": "pg",
+    "name": "Stanza living belgrade house",
+    "rent": 8700,
+    "area": "SR Nagar",
+    "lat": 17.442654,
+    "lng": 78.44958,
+    "notes": "Male Only - Triple Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler (congested), Electricity: Separate bill | Slow wifi, ~1.5km walk to metro | Source: community sheet, contributor Anonymous",
+    "link": "tel:9398537139"
+  },
+  {
+    "id": "r137",
+    "type": "pg",
+    "name": "Jagan reddy Mens PG",
+    "rent": 6500,
+    "area": "Gowlidoddy",
+    "lat": 17.418348,
+    "lng": 78.354682,
+    "notes": "Male Only - Four Sharing | Food 4/5, rating 4/5 | Parking: 2-Wheeler (congested), Electricity: Included in rent | Source: community sheet, contributor Anonymous",
+    "link": ""
+  },
+  {
+    "id": "r138",
+    "type": "pg",
+    "name": "A's Grand Mens PG",
+    "rent": 9500,
+    "area": "Madhapur",
+    "lat": 17.452044,
+    "lng": 78.387216,
+    "notes": "Male Only - Four Sharing | Food 3/5, rating 3/5 | Parking: 2-Wheeler, Electricity: Separate bill | Walkable to Mindspace, 500+ bed accommodation, gym 500/mo extra | Source: community sheet, contributor Anonymous",
+    "link": "tel:9390466665"
+  },
+  {
+    "id": "s6",
+    "type": "flat",
+    "name": "1BHK, Gachibowli (avg)",
+    "rent": 12992,
+    "area": "Gachibowli",
+    "lat": 17.441,
+    "lng": 78.347,
+    "notes": "Locality average for 1BHK — illustrative, not a single live listing.",
+    "link": ""
+  },
+  {
+    "id": "s7",
+    "type": "flat",
+    "name": "2BHK, Gachibowli (avg)",
+    "rent": 44400,
+    "area": "Gachibowli",
+    "lat": 17.445,
+    "lng": 78.354,
+    "notes": "Locality average for 2BHK — illustrative, not a single live listing.",
+    "link": ""
+  },
+  {
+    "id": "s8",
+    "type": "flat",
+    "name": "3BHK, Jayabheri Orange County",
+    "rent": 57000,
+    "area": "Gachibowli",
+    "lat": 17.4358,
+    "lng": 78.3412,
+    "notes": "Semi-furnished, 4th floor, garden view. Approximate location pin.",
+    "link": ""
+  },
+  {
+    "id": "s9",
+    "type": "flat",
+    "name": "3BHK, My Home Avatar",
+    "rent": 80000,
+    "area": "Gachibowli",
+    "lat": 17.4488,
+    "lng": 78.3493,
+    "notes": "Furnished, premium amenities. Approximate location pin.",
+    "link": ""
+  },
+  {
+    "id": "s10",
+    "type": "flat",
+    "name": "3BHK, Vertex Panache",
+    "rent": 50000,
+    "area": "Gachibowli",
+    "lat": 17.4505,
+    "lng": 78.359,
+    "notes": "Semi-furnished, pool + gym. Approximate location pin.",
+    "link": ""
+  }
+];
+
+async function loadListings(){
+  let stored = null;
+  try{
+    const res = await window.storage.get(STORAGE_KEY);
+    stored = res ? JSON.parse(res.value) : null;
+  }catch(e){ stored = null; }
+
+  let storedVersion = null;
+  try{
+    const v = await window.storage.get('seed_version');
+    storedVersion = v ? v.value : null;
+  }catch(e){ storedVersion = null; }
+
+  if(!stored){
+    listings = SEED;
+    await saveListings();
+    await window.storage.set('seed_version', SEED_VERSION);
+  } else if(storedVersion !== SEED_VERSION){
+    const userAdded = stored.filter(l => String(l.id).startsWith('u'));
+    listings = SEED.concat(userAdded);
+    await saveListings();
+    await window.storage.set('seed_version', SEED_VERSION);
+  } else {
+    listings = stored;
+  }
+  renderAll();
+}
+
+async function saveListings(){
+  try{ await window.storage.set(STORAGE_KEY, JSON.stringify(listings)); }
+  catch(e){ console.error('save failed', e); }
+}
+
+function fmtRent(n){ return '₹' + Number(n).toLocaleString('en-IN'); }
+
+function markerColor(type){ return type === 'pg' ? '#ef4444' : '#3b82f6'; }
+
+function pinIconHtml(type){
+  const color = markerColor(type);
+  const emoji = type === 'flat' ? '💙' : '🌸';
+  return `
+    <div class="cute-pin">
+      <svg width="34" height="46" viewBox="0 0 34 46">
+        <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z"
+              fill="${color}" stroke="#fff" stroke-width="2.5"/>
+        <circle cx="17" cy="17" r="10" fill="#fff" fill-opacity="0.9"/>
+      </svg>
+      <span class="pin-emoji">${emoji}</span>
+    </div>`;
+}
+
+function makeMarker(item){
+  const icon = L.divIcon({
+    className: '',
+    html: pinIconHtml(item.type),
+    iconSize: [34, 46],
+    iconAnchor: [17, 44],
+    popupAnchor: [0, -40]
+  });
+  const m = L.marker([item.lat, item.lng], { icon }).addTo(map);
+  m.bindPopup(popupHtml(item));
+  m.on('popupopen', () => bindPopupActions(item.id));
+  return m;
+}
+
+function popupHtml(item){
+  return `
+    <div style="min-width:190px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:2px;">${escapeHtml(item.name)}</div>
+      <div style="font-size:11px;color:#b07f96;margin-bottom:6px;">${escapeHtml(item.area || '')}</div>
+      <div style="font-size:15px;font-weight:700;color:${markerColor(item.type)};">${fmtRent(item.rent)}<span style="font-size:11px;color:#b07f96;font-weight:400;">/mo</span></div>
+      ${item.notes ? `<div style="font-size:11px;color:#b07f96;margin-top:6px;">${escapeHtml(item.notes)}</div>` : ''}
+      ${item.link ? `<div style="margin-top:6px;"><a href="${escapeAttr(item.link)}" target="_blank" style="font-size:11px;color:#ff6fa5;">${item.link.startsWith('tel:') ? 'Call PG owner →' : 'Open listing →'}</a></div>` : ''}
+    </div>`;
+}
+
+function bindPopupActions(id){}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+function passesFilter(item){
+  if(item.type === 'flat' && !filters.flat) return false;
+  if(item.type === 'pg' && !filters.pg) return false;
+  if(item.rent > filters.maxRent) return false;
+  return true;
+}
+
+function renderAll(){
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+  const listEl = document.getElementById('list');
+  listEl.innerHTML = '';
+
+  const visible = listings.filter(passesFilter);
+  if(visible.length === 0){
+    listEl.innerHTML = '<div class="empty">No listings match your filters yet.<br>Add one with the button above.</div>';
+  }
+
+  visible
+    .sort((a,b) => a.rent - b.rent)
+    .forEach(item => {
+      markers[item.id] = makeMarker(item);
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-name">${escapeHtml(item.name)}</div>
+          <div class="badge ${item.type}">${item.type === 'pg' ? 'PG' : 'FLAT'}</div>
+        </div>
+        <div class="card-rent" style="color:${markerColor(item.type)}">${fmtRent(item.rent)}<span style="font-size:11px;color:var(--muted);font-weight:400;"> /mo</span></div>
+        <div class="card-area">${escapeHtml(item.area || '')}</div>
+        ${item.notes ? `<div class="card-notes">${escapeHtml(item.notes)}</div>` : ''}
+        <div class="card-actions">
+          <button class="del" data-id="${item.id}">Delete</button>
+        </div>
+      `;
+      card.addEventListener('click', (e) => {
+        if(e.target.closest('.del')) return;
+        map.flyTo([item.lat, item.lng], 15, {duration:0.6});
+        markers[item.id].openPopup();
+      });
+      card.querySelector('.del').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        listings = listings.filter(l => l.id !== item.id);
+        await saveListings();
+        renderAll();
+      });
+      listEl.appendChild(card);
+    });
+}
+
+// --- Filter controls ---
+document.getElementById('toggleFlat').addEventListener('click', (e) => {
+  filters.flat = !filters.flat;
+  e.target.classList.toggle('active', filters.flat);
+  renderAll();
+});
+document.getElementById('togglePg').addEventListener('click', (e) => {
+  filters.pg = !filters.pg;
+  e.target.classList.toggle('active', filters.pg);
+  renderAll();
+});
+const rentSlider = document.getElementById('rentSlider');
+rentSlider.addEventListener('input', () => {
+  filters.maxRent = Number(rentSlider.value);
+  document.getElementById('rentVal').textContent = fmtRent(filters.maxRent);
+  renderAll();
+});
+
+// --- Add listing flow ---
+const addBtn = document.getElementById('addBtn');
+addBtn.addEventListener('click', () => {
+  addMode = !addMode;
+  addBtn.classList.toggle('active', addMode);
+  addBtn.textContent = addMode ? 'Tap the map to place a pin…' : '+ Add a listing (click map)';
+  if(!addMode && tempMarker){ map.removeLayer(tempMarker); tempMarker = null; }
+});
+
+map.on('click', (e) => {
+  if(!addMode) return;
+  if(tempMarker) map.removeLayer(tempMarker);
+  const tempIcon = L.divIcon({
+    className: '',
+    html: `<div class="cute-pin temp-pin">
+      <svg width="34" height="46" viewBox="0 0 34 46">
+        <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z"
+              fill="#ff6fa5" stroke="#fff" stroke-width="2.5"/>
+        <circle cx="17" cy="17" r="10" fill="#fff" fill-opacity="0.9"/>
+      </svg>
+      <span class="pin-emoji">✨</span>
+    </div>`,
+    iconSize: [34, 46],
+    iconAnchor: [17, 44],
+    popupAnchor: [0, -40]
+  });
+  tempMarker = L.marker(e.latlng, { icon: tempIcon }).addTo(map);
+  tempMarker.bindPopup(addFormHtml(e.latlng)).openPopup();
+  tempMarker.on('popupclose', () => {
+    if(tempMarker){ map.removeLayer(tempMarker); tempMarker = null; }
+  });
+});
+
+function addFormHtml(latlng){
+  const formId = 'newform_' + Date.now();
+  setTimeout(() => wireAddForm(formId, latlng), 0);
+  return `
+    <div class="popup-form" id="${formId}" style="min-width:210px">
+      <label>Name / building</label>
+      <input type="text" class="f-name" placeholder="e.g. Golf Edge PG">
+      <div class="row">
+        <div>
+          <label>Type</label>
+          <select class="f-type">
+            <option value="flat">Flat</option>
+            <option value="pg">PG</option>
+          </select>
+        </div>
+        <div>
+          <label>Rent / mo (₹)</label>
+          <input type="number" class="f-rent" placeholder="15000">
+        </div>
+      </div>
+      <label>Area</label>
+      <input type="text" class="f-area" placeholder="e.g. Madhapur">
+      <label>Notes</label>
+      <textarea class="f-notes" placeholder="Sharing type, food, brokerage, contact…"></textarea>
+      <label>Listing link (optional)</label>
+      <input type="text" class="f-link" placeholder="https://...">
+      <button class="popup-save">Save listing</button>
+    </div>`;
+}
+
+function wireAddForm(formId, latlng){
+  const root = document.getElementById(formId);
+  if(!root) return;
+  root.querySelector('.popup-save').addEventListener('click', async () => {
+    const name = root.querySelector('.f-name').value.trim() || 'Untitled listing';
+    const type = root.querySelector('.f-type').value;
+    const rent = Number(root.querySelector('.f-rent').value) || 0;
+    const area = root.querySelector('.f-area').value.trim();
+    const notes = root.querySelector('.f-notes').value.trim();
+    const link = root.querySelector('.f-link').value.trim();
+    const item = {
+      id: 'u' + Date.now(),
+      type, name, rent, area, notes, link,
+      lat: latlng.lat, lng: latlng.lng
+    };
+    listings.push(item);
+    await saveListings();
+    if(tempMarker){ map.removeLayer(tempMarker); tempMarker = null; }
+    addMode = false;
+    addBtn.classList.remove('active');
+    addBtn.textContent = '+ Add a listing (click map)';
+    renderAll();
+  });
+}
+
+loadListings();
+</script>
+</body>
+</html>
